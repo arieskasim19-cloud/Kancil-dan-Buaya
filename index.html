@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Petualangan Si Kancil: Jembatan Rasio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            background-color: #1e3a29;
+        }
+        h1, h2, h3, .font-game {
+            font-family: 'Fredoka', sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* Animasi Pop-up Modal */
+        @keyframes popIn {
+            0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        /* Animasi Tombol 3D */
+        .btn-3d {
+            transition: all 0.1s ease;
+            box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25);
+        }
+        .btn-3d:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+        }
+        .btn-wood {
+            background: linear-gradient(180deg, #a4632b 0%, #7c4418 100%);
+            border: 3px solid #52290a;
+            box-shadow: 0 6px 0 #3d1d05, 0 10px 15px rgba(0,0,0,0.4);
+        }
+        .btn-wood:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #3d1d05, 0 4px 8px rgba(0,0,0,0.4);
+        }
+        /* Scrollbar halus untuk soal panjang di layar kecil */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #fef3c7;
+            border-radius: 10px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #d97706;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative flex items-center justify-center">
+
+    <!-- Canvas Utama untuk Dunia Game (Sungai, Hutan, Buaya, Kayu, Kancil) -->
+    <canvas id="gameCanvas" class="absolute inset-0 z-0"></canvas>
+
+    <!-- HUD (Heads-Up Display) Atas -->
+    <div id="hud" class="hidden absolute top-0 left-0 right-0 z-20 p-2 sm:p-4 flex justify-between items-center pointer-events-none">
+        <!-- Indikator Nyawa & Skor -->
+        <div class="flex items-center gap-2 sm:gap-3 bg-amber-950/90 backdrop-blur-md border-2 border-amber-500/60 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl shadow-xl pointer-events-auto">
+            <div class="flex items-center gap-1" id="heartsContainer" title="Nyawa Kancil">
+                <!-- Ikon Hati Diisi via JS -->
+            </div>
+            <div class="h-5 sm:h-6 w-0.5 bg-amber-700 mx-0.5 sm:mx-1"></div>
+            <div class="text-amber-200 font-game text-xs sm:text-base">
+                Pos: <span id="progressText" class="text-yellow-400 font-bold">0 / 5</span>
+            </div>
+        </div>
+
+        <!-- Tombol Audio & Reset -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <button id="soundToggleBtn" class="bg-amber-950/90 hover:bg-amber-900 text-amber-200 border-2 border-amber-500/60 p-2 sm:p-2.5 rounded-2xl shadow-lg transition transform hover:scale-105" title="Suara On/Off">
+                <svg id="soundIconOn" class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                <svg id="soundIconOff" class="w-5 h-5 sm:w-6 sm:h-6 hidden text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Panel Soal Matematika di Bagian Atas Aplikasi (Tidak Menutupi Sungai & Kancil) -->
+    <div id="questionModal" class="hidden fixed top-14 sm:top-16 left-1/2 transform -translate-x-1/2 z-10 w-[96%] max-w-4xl px-1 pointer-events-auto">
+        <div class="bg-gradient-to-b from-amber-50/95 to-orange-50/95 backdrop-blur-md border-4 border-amber-700 rounded-3xl p-3 sm:p-4 shadow-2xl animate-pop">
+            <!-- Header Ringkas Soal -->
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-amber-200 pb-2 mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="bg-amber-600 text-white font-game text-xs sm:text-sm px-2.5 py-0.5 rounded-lg shadow">
+                        Soal #<span id="qNumber">1</span> / 5
+                    </span>
+                    <span id="qTimerBadge" class="bg-amber-100 text-amber-900 border border-amber-400 font-game text-xs sm:text-sm px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-2xs">
+                        <span>⏱️</span>
+                        <span id="qTimerText">01:00</span>
+                    </span>
+                    <span class="hidden md:inline text-xs sm:text-sm font-bold text-amber-900">Jawab benar agar Si Kancil melompat! 🦌🪵</span>
+                </div>
+                <!-- Umpan Balik Instan (Benar/Salah) di Baris Header -->
+                <div id="feedbackBanner" class="hidden px-3 py-1 rounded-lg font-bold text-xs sm:text-sm"></div>
+            </div>
+
+            <!-- Teks Cerita Soal -->
+            <div class="bg-white/95 border border-amber-300 rounded-2xl p-2.5 sm:p-3 mb-2.5 shadow-inner max-h-24 sm:max-h-28 overflow-y-auto custom-scroll">
+                <p id="qText" class="text-gray-800 font-bold text-xs sm:text-base leading-snug">
+                    Memuat soal...
+                </p>
+            </div>
+
+            <!-- Pilihan Jawaban A, B, C, D -->
+            <div id="optionsContainer" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <!-- Tombol opsi dirender dinamis via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Layar Mulai (Start Screen) -->
+    <div id="startScreen" class="relative z-20 max-w-lg w-11/12 bg-gradient-to-b from-amber-50 to-amber-100 border-4 border-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl text-center animate-pop">
+        <div class="inline-block bg-emerald-600 text-white text-xs sm:text-sm font-bold px-3 py-1 rounded-full mb-3 shadow">
+            MATEMATIKA SD • MATERI PERBANDINGAN (RASIO)
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-amber-900 mb-2 drop-shadow-sm">
+            Petualangan Si Kancil
+        </h1>
+        <p class="text-amber-800 font-semibold text-sm sm:text-base mb-5">
+            Bantu Si Kancil menyeberangi sungai yang penuh buaya lapar dengan melompati <span class="text-emerald-700 font-extrabold">5 potongan kayu</span>!
+        </p>
+
+        <div class="bg-amber-200/70 border-2 border-amber-400 rounded-2xl p-4 mb-6 text-left text-xs sm:text-sm text-amber-950 space-y-2">
+            <div class="flex items-start gap-2.5">
+                <span class="text-lg">🧠</span>
+                <span>Perhatikan <b>soal perbandingan</b> yang muncul di bagian atas layar.</span>
+            </div>
+            <div class="flex items-start gap-2.5">
+                <span class="text-lg">🦌</span>
+                <span>Jika jawabanmu <b>benar</b>, Si Kancil akan <b>melompat otomatis</b> ke potongan kayu berikutnya!</span>
+            </div>
+            <div class="flex items-start gap-2.5">
+                <span class="text-lg">🐊</span>
+                <span>Hati-hati! Jika jawaban salah, kayu di depan akan oleng dan buaya mendekat!</span>
+            </div>
+        </div>
+
+        <button id="startBtn" class="btn-3d w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-game text-xl sm:text-2xl py-4 rounded-2xl border-2 border-emerald-800 cursor-pointer">
+            MULAI PETUALANGAN 🚀
+        </button>
+    </div>
+
+    <!-- Layar Akhir (Menang / Kalah) -->
+    <div id="endScreen" class="hidden relative z-30 max-w-md w-11/12 bg-gradient-to-b from-amber-50 to-amber-100 border-4 border-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl text-center animate-pop">
+        <div id="endEmoji" class="text-6xl mb-3">🏆</div>
+        <h2 id="endTitle" class="text-2xl sm:text-3xl font-extrabold text-amber-900 mb-2">
+            Selamat! Kancil Berhasil!
+        </h2>
+        <p id="endMessage" class="text-amber-800 font-semibold text-sm sm:text-base mb-5">
+            Si Kancil berhasil menyeberangi sungai dengan kecerdasan matematikamu!
+        </p>
+
+        <div class="bg-white/80 border-2 border-amber-300 rounded-2xl p-4 mb-6 flex justify-around">
+            <div>
+                <div class="text-xs text-gray-500 font-bold uppercase">Kayu Dilewati</div>
+                <div id="finalLogs" class="text-2xl font-game font-bold text-emerald-600">5 / 5</div>
+            </div>
+            <div class="w-0.5 bg-amber-200"></div>
+            <div>
+                <div class="text-xs text-gray-500 font-bold uppercase">Sisa Nyawa</div>
+                <div id="finalLives" class="text-2xl font-game font-bold text-rose-500">3 ❤️</div>
+            </div>
+        </div>
+
+        <button id="restartBtn" class="btn-3d w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-game text-xl py-3.5 rounded-2xl border-2 border-amber-800 cursor-pointer">
+            MAIN LAGI 🔄
+        </button>
+    </div>
+
+    <script>
+        /**
+         * BANK SOAL RASIO / PERBANDINGAN (DIAMBIL DARI DOKUMEN LAMPIRAN)
+         */
+        const QUESTIONS = [
+            {
+                question: "Fadrizan dan Sukran adalah saudara. Umur Fadrizan 32 tahun, sedangkan umur Sukran 40 tahun. Perbandingan umur Fadrizan dan Sukran adalah ...",
+                options: [
+                    { label: "A", text: "4 : 5" },
+                    { label: "B", text: "3 : 4" },
+                    { label: "C", text: "3 : 5" },
+                    { label: "D", text: "2 : 3" }
+                ],
+                correctIndex: 0,
+                explanation: "32 : 40 disederhanakan dengan dibagi 8 menjadi 4 : 5."
+            },
+            {
+                question: "Pak Kepala Desa meminta Wahyu dan Erwin untuk mengumpulkan kelapa di kebun milik Pak Kepala Desa. Perbandingan kelapa yang dikumpulkan Wahyu dan Erwin adalah 4 : 5. Jika Erwin berhasil mengumpulkan kelapa sebanyak 20 buah, maka kelapa yang berhasil dikumpulkan Wahyu adalah sebanyak ...",
+                options: [
+                    { label: "A", text: "20 buah" },
+                    { label: "B", text: "16 buah" },
+                    { label: "C", text: "21 buah" },
+                    { label: "D", text: "14 buah" }
+                ],
+                correctIndex: 1,
+                explanation: "Kelapa Wahyu = (4 / 5) × 20 = 16 buah."
+            },
+            {
+                question: "Perbandingan umur Ilham dan Radit adalah 2 : 3. Jika jumlah umur mereka 25 tahun. Maka umur Radit adalah ...",
+                options: [
+                    { label: "A", text: "16 tahun" },
+                    { label: "B", text: "17 tahun" },
+                    { label: "C", text: "15 tahun" },
+                    { label: "D", text: "18 tahun" }
+                ],
+                correctIndex: 2,
+                explanation: "Umur Radit = (3 / (2 + 3)) × 25 = (3 / 5) × 25 = 15 tahun."
+            },
+            {
+                question: "Farhan dan Aliando bekerja sebagai pemetik buah mangga di kebun Pak Joko. Pada saat panen tiba, perbandingan jumlah petikan mangga Farhan dan Aliando adalah 2 : 5. Jika selisih jumlah petikan mangga Farhan dan Aliando adalah 27 buah mangga. Maka jumlah mangga yang berhasil dipetik Aliando adalah ...",
+                options: [
+                    { label: "A", text: "30 buah" },
+                    { label: "B", text: "35 buah" },
+                    { label: "C", text: "40 buah" },
+                    { label: "D", text: "45 buah" }
+                ],
+                correctIndex: 3,
+                explanation: "Mangga Aliando = (5 / (5 - 2)) × 27 = (5 / 3) × 27 = 45 buah."
+            },
+            {
+                question: "Perbandingan umur Ilal dan Erwin adalah 3 : 4. Jika selisih umur mereka adalah 3 tahun, maka jumlah umur mereka adalah ...",
+                options: [
+                    { label: "A", text: "21 tahun" },
+                    { label: "B", text: "20 tahun" },
+                    { label: "C", text: "19 tahun" },
+                    { label: "D", text: "18 tahun" }
+                ],
+                correctIndex: 0,
+                explanation: "Jumlah umur = ((3 + 4) / (4 - 3)) × 3 = (7 / 1) × 3 = 21 tahun."
+            }
+        ];
+
+        /**
+         * SISTEM EFEK SUARA SINTETIS (WEB AUDIO API)
+         */
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+            playTone(freq, type, duration, delay = 0, vol = 0.2) {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime + delay);
+
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime + delay);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + delay + duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(this.ctx.currentTime + delay);
+                osc.stop(this.ctx.currentTime + delay + duration);
+            }
+            playJump() {
+                this.playTone(300, 'sine', 0.15, 0, 0.2);
+                this.playTone(520, 'sine', 0.2, 0.08, 0.2);
+            }
+            playCorrect() {
+                this.playTone(523.25, 'triangle', 0.15, 0, 0.25);
+                this.playTone(659.25, 'triangle', 0.15, 0.1, 0.25);
+                this.playTone(783.99, 'triangle', 0.3, 0.2, 0.25);
+            }
+            playSplashAndSnap() {
+                this.playTone(180, 'sawtooth', 0.25, 0, 0.25);
+                this.playTone(110, 'sawtooth', 0.35, 0.15, 0.3);
+            }
+            playWin() {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((n, i) => this.playTone(n, 'triangle', 0.25, i * 0.12, 0.25));
+            }
+        }
+        const sfx = new SoundEffects();
+
+        /**
+         * MEMUAT GAMBAR KUSTOM (KANCIL & POTONGAN KAYU) & MENGHAPUS LATAR PUTIH
+         */
+        const assets = {
+            kancil: {
+                img: new Image(),
+                processed: null,
+                loaded: false
+            },
+            log: {
+                img: new Image(),
+                processed: null,
+                loaded: false
+            }
+        };
+
+        // Fungsi untuk membuat latar belakang putih/terang pada gambar menjadi transparan
+        function removeWhiteBackground(imageObj, tolerance = 235) {
+            try {
+                const offCanvas = document.createElement('canvas');
+                offCanvas.width = imageObj.naturalWidth || imageObj.width;
+                offCanvas.height = imageObj.naturalHeight || imageObj.height;
+                const offCtx = offCanvas.getContext('2d');
+                offCtx.drawImage(imageObj, 0, 0);
+
+                const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+                const data = imgData.data;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    // Deteksi piksel putih atau abu-abu sangat terang di latar belakang
+                    if (r >= tolerance && g >= tolerance && b >= tolerance) {
+                        data[i + 3] = 0; // Jadikan transparan
+                    } else if (r >= tolerance - 20 && g >= tolerance - 20 && b >= tolerance - 20) {
+                        // Penghalusan tepi (anti-aliasing)
+                        const avg = (r + g + b) / 3;
+                        const alphaFactor = 1 - (avg - (tolerance - 20)) / 20;
+                        data[i + 3] = Math.max(0, Math.min(255, data[i + 3] * alphaFactor));
+                    }
+                }
+
+                offCtx.putImageData(imgData, 0, 0);
+                return offCanvas;
+            } catch (err) {
+                // Jika terhalang CORS browser, kembalikan gambar asli
+                return imageObj;
+            }
+        }
+
+        // Fungsi khusus untuk menghapus latar belakang putih pada potongan kayu hingga tersisa gambar kayu saja
+        function extractWoodOnly(imageObj) {
+            try {
+                const w = imageObj.naturalWidth || imageObj.width;
+                const h = imageObj.naturalHeight || imageObj.height;
+                const offCanvas = document.createElement('canvas');
+                offCanvas.width = w;
+                offCanvas.height = h;
+                const offCtx = offCanvas.getContext('2d');
+                offCtx.drawImage(imageObj, 0, 0);
+
+                const imgData = offCtx.getImageData(0, 0, w, h);
+                const data = imgData.data;
+
+                // Hapus seluruh piksel putih & abu-abu terang di seluruh area gambar (tepi maupun celah kayu)
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+
+                    // Piksel putih / terang netral (bukan warna cokelat kayu yang memiliki selisih R > B tinggi)
+                    const isBrownish = (r - b) > 28 && (r - g) > 8;
+                    const brightness = (r + g + b) / 3;
+
+                    if (!isBrownish && brightness >= 210) {
+                        data[i + 3] = 0;
+                    } else if (!isBrownish && brightness >= 185) {
+                        // Penghalusan tepi kayu
+                        const alpha = Math.max(0, Math.min(255, ((210 - brightness) / 25) * 255));
+                        data[i + 3] = Math.min(data[i + 3], alpha);
+                    }
+                }
+
+                offCtx.putImageData(imgData, 0, 0);
+                return offCanvas;
+            } catch (err) {
+                return null;
+            }
+        }
+
+        assets.kancil.img.crossOrigin = "Anonymous";
+        assets.kancil.img.onload = () => {
+            assets.kancil.processed = removeWhiteBackground(assets.kancil.img, 232);
+            assets.kancil.loaded = true;
+        };
+        assets.kancil.img.onerror = () => {
+            if (assets.kancil.img.crossOrigin) {
+                assets.kancil.img.crossOrigin = null;
+                assets.kancil.img.src = "https://iili.io/oK6Ykrb.md.jpg";
+            } else {
+                assets.kancil.loaded = false;
+            }
+        };
+        assets.kancil.img.src = "https://iili.io/oK6Ykrb.md.jpg";
+
+        assets.log.img.crossOrigin = "Anonymous";
+        assets.log.img.onload = () => {
+            assets.log.processed = extractWoodOnly(assets.log.img);
+            assets.log.loaded = true;
+        };
+        assets.log.img.onerror = () => {
+            if (assets.log.img.crossOrigin) {
+                assets.log.img.crossOrigin = null;
+                assets.log.img.src = "https://iili.io/oK6czRR.md.jpg";
+            } else {
+                assets.log.loaded = false;
+            }
+        };
+        assets.log.img.src = "https://iili.io/oK6czRR.md.jpg";
+
+        /**
+         * KONFIGURASI CANVAS & STATE GAME
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            recalculatePositions();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // State Utama Permainan
+        const QUESTION_TIME_LIMIT = 60; // 1 menit (60 detik) per soal
+        let questionTimerInterval = null;
+        let timeLeft = QUESTION_TIME_LIMIT;
+
+        const gameState = {
+            screen: 'START', // START, QUESTION, JUMPING, FALLING, VICTORY, GAMEOVER
+            currentStep: 0,  // 0 = Tepi Kiri, 1..5 = Kayu 1..5, 6 = Tepi Kanan (Tujuan)
+            lives: 3,
+            maxLives: 3,
+            time: 0,
+            logs: [],
+            crocodiles: [],
+            trees: [],
+            particles: [],
+            ripples: [],
+            kancil: {
+                x: 0,
+                y: 0,
+                startX: 0,
+                startY: 0,
+                targetX: 0,
+                targetY: 0,
+                jumpProgress: 0,
+                scaleX: 1,
+                scaleY: 1,
+                rotation: 0,
+                isScared: false
+            }
+        };
+
+        function recalculatePositions() {
+            const leftBankWidth = Math.max(70, width * 0.13);
+            const rightBankWidth = Math.max(70, width * 0.13);
+            const riverStart = leftBankWidth;
+            const riverEnd = width - rightBankWidth;
+            const riverWidth = riverEnd - riverStart;
+            // Geser posisi sungai & kayu sedikit ke bawah agar tidak tertutup panel soal di bagian atas
+            const riverCenterY = height * 0.72;
+
+            // 5 Potongan Kayu di tengah sungai
+            const numLogs = 5;
+            const spacing = riverWidth / (numLogs + 1);
+
+            if (gameState.logs.length === 0) {
+                for (let i = 0; i < numLogs; i++) {
+                    gameState.logs.push({
+                        index: i + 1,
+                        x: riverStart + spacing * (i + 1),
+                        baseY: riverCenterY + (i % 2 === 0 ? -14 : 14),
+                        y: riverCenterY,
+                        width: Math.min(115, spacing * 0.88),
+                        height: Math.min(155, height * 0.25),
+                        bobOffset: i * 1.3,
+                        sinking: 0,
+                        solved: false
+                    });
+                }
+            } else {
+                for (let i = 0; i < numLogs; i++) {
+                    gameState.logs[i].x = riverStart + spacing * (i + 1);
+                    gameState.logs[i].baseY = riverCenterY + (i % 2 === 0 ? -14 : 14);
+                    gameState.logs[i].width = Math.min(115, spacing * 0.88);
+                    gameState.logs[i].height = Math.min(155, height * 0.25);
+                }
+            }
+
+            // Update posisi Kancil jika tidak sedang melompat
+            if (gameState.screen !== 'JUMPING' && gameState.screen !== 'FALLING') {
+                const pos = getStepCoordinates(gameState.currentStep);
+                gameState.kancil.x = pos.x;
+                gameState.kancil.y = pos.y;
+            }
+        }
+
+        function getStepCoordinates(step) {
+            const leftBankWidth = Math.max(70, width * 0.13);
+            const rightBankWidth = Math.max(70, width * 0.13);
+            const riverCenterY = height * 0.72;
+
+            if (step === 0) {
+                return { x: leftBankWidth * 0.55, y: riverCenterY };
+            } else if (step >= 1 && step <= 5) {
+                const log = gameState.logs[step - 1];
+                // Titik pijakan kaki Kancil tepat di bagian tengah potongan kayu
+                return { x: log.x, y: log.baseY };
+            } else {
+                return { x: width - rightBankWidth * 0.5, y: riverCenterY };
+            }
+        }
+
+        function initEnvironment() {
+            gameState.logs = [];
+            recalculatePositions();
+
+            // Buat 6 Buaya Realistis yang berpatroli di area sungai bagian bawah
+            gameState.crocodiles = [];
+            const crocCount = 6;
+            for (let i = 0; i < crocCount; i++) {
+                const isTop = i % 2 === 0;
+                gameState.crocodiles.push({
+                    x: width * (0.2 + (i * 0.12)),
+                    y: isTop ? height * 0.53 : height * 0.89,
+                    baseY: isTop ? height * 0.53 : height * 0.89,
+                    speed: (0.4 + Math.random() * 0.45) * (isTop ? 1 : -1),
+                    dir: isTop ? 1 : -1,
+                    tailPhase: Math.random() * Math.PI * 2,
+                    jawOpen: 0,
+                    targetMode: false,
+                    scale: Math.min(0.95, Math.max(0.6, width / 1150))
+                });
+            }
+
+            // Dekorasi Pepohonan di tepi kiri & kanan
+            gameState.trees = [
+                { x: 25, y: height * 0.52, size: 42 },
+                { x: 45, y: height * 0.88, size: 48 },
+                { x: width - 30, y: height * 0.55, size: 45 },
+                { x: width - 45, y: height * 0.86, size: 50 }
+            ];
+        }
+
+        /**
+         * LOGIKA ALUR PERMAINAN
+         */
+        function startGame() {
+            sfx.init();
+            gameState.currentStep = 0;
+            gameState.lives = 3;
+            gameState.kancil.isScared = false;
+            gameState.kancil.rotation = 0;
+            gameState.kancil.scaleX = 1;
+            gameState.kancil.scaleY = 1;
+
+            initEnvironment();
+            updateHUD();
+
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('endScreen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+
+            // Kancil melompat pertama kali dari tepi sungai ke atas potongan kayu ke-1
+            setTimeout(() => {
+                triggerJump();
+            }, 450);
+        }
+
+        function triggerJump() {
+            sfx.playJump();
+            // Sembunyikan panel soal selama Kancil melayang di udara
+            document.getElementById('questionModal').classList.add('hidden');
+
+            const nextStep = gameState.currentStep + 1;
+            const startPos = getStepCoordinates(gameState.currentStep);
+            const targetPos = getStepCoordinates(nextStep);
+
+            gameState.kancil.startX = startPos.x;
+            gameState.kancil.startY = startPos.y;
+            gameState.kancil.targetX = targetPos.x;
+            gameState.kancil.targetY = targetPos.y;
+            gameState.kancil.jumpProgress = 0;
+            gameState.kancil.isScared = false;
+            gameState.screen = 'JUMPING';
+        }
+
+        function stopQuestionTimer() {
+            if (questionTimerInterval !== null) {
+                clearInterval(questionTimerInterval);
+                questionTimerInterval = null;
+            }
+        }
+
+        function updateTimerDisplay() {
+            const safeSeconds = Math.max(0, timeLeft);
+            const mins = Math.floor(safeSeconds / 60);
+            const secs = safeSeconds % 60;
+            const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+            const timerText = document.getElementById('qTimerText');
+            const timerBadge = document.getElementById('qTimerBadge');
+            if (timerText) timerText.textContent = formatted;
+
+            if (timerBadge) {
+                if (safeSeconds <= 10) {
+                    timerBadge.className = 'bg-rose-100 text-rose-800 border border-rose-500 font-game text-xs sm:text-sm px-2.5 py-0.5 rounded-lg flex items-center gap-1 animate-pulse';
+                } else {
+                    timerBadge.className = 'bg-amber-100 text-amber-900 border border-amber-400 font-game text-xs sm:text-sm px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-2xs';
+                }
+            }
+        }
+
+        function startQuestionTimer(logIndex) {
+            stopQuestionTimer();
+            timeLeft = QUESTION_TIME_LIMIT;
+            updateTimerDisplay();
+
+            questionTimerInterval = setInterval(() => {
+                if (gameState.screen !== 'QUESTION') {
+                    stopQuestionTimer();
+                    return;
+                }
+
+                timeLeft--;
+                updateTimerDisplay();
+
+                if (timeLeft <= 0) {
+                    stopQuestionTimer();
+                    handleTimeOut(logIndex);
+                }
+            }, 1000);
+        }
+
+        function handleTimeOut(logIndex) {
+            const allBtns = document.getElementById('optionsContainer').querySelectorAll('button');
+            const feedback = document.getElementById('feedbackBanner');
+
+            allBtns.forEach(b => {
+                b.disabled = true;
+            });
+
+            sfx.playSplashAndSnap();
+            feedback.className = 'px-3 py-1 rounded-lg font-bold text-xs sm:text-sm bg-rose-100 text-rose-800 border border-rose-400';
+            feedback.innerHTML = '⏰ Waktu habis! Kayu tempat Kancil berpijak oleng & buaya mendekat!';
+            feedback.classList.remove('hidden');
+
+            gameState.lives--;
+            updateHUD();
+
+            setTimeout(() => {
+                triggerWrongReaction(logIndex);
+            }, 900);
+        }
+
+        function showQuestionModal(questionNumber) {
+            gameState.screen = 'QUESTION';
+            const qData = QUESTIONS[questionNumber - 1];
+
+            document.getElementById('qNumber').textContent = questionNumber;
+            document.getElementById('qText').textContent = qData.question;
+
+            const feedback = document.getElementById('feedbackBanner');
+            feedback.classList.add('hidden');
+
+            const container = document.getElementById('optionsContainer');
+            container.innerHTML = '';
+
+            qData.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-3d bg-white hover:bg-amber-100 border-2 border-amber-400 text-amber-950 font-bold text-left px-3 py-2 sm:py-2.5 rounded-xl flex items-center gap-2 cursor-pointer transition';
+                btn.innerHTML = `
+                    <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-amber-600 text-white font-game text-xs sm:text-sm flex items-center justify-center shrink-0 shadow-xs">${opt.label}</span>
+                    <span class="text-xs sm:text-sm leading-tight">${opt.text}</span>
+                `;
+                btn.onclick = () => handleAnswer(idx, btn);
+                container.appendChild(btn);
+            });
+
+            document.getElementById('questionModal').classList.remove('hidden');
+            startQuestionTimer(questionNumber - 1);
+        }
+
+        function handleAnswer(selectedIndex, selectedBtn) {
+            stopQuestionTimer();
+            // Soal yang sedang aktif sesuai posisi potongan kayu tempat Kancil berpijak (1..5 -> index 0..4)
+            const logIndex = gameState.currentStep - 1;
+            const qData = QUESTIONS[logIndex];
+            const allBtns = document.getElementById('optionsContainer').querySelectorAll('button');
+            const feedback = document.getElementById('feedbackBanner');
+
+            // Kunci semua tombol agar tidak diklik ganda
+            allBtns.forEach(b => b.disabled = true);
+
+            if (selectedIndex === qData.correctIndex) {
+                // JAWABAN BENAR -> Kancil Melompat Otomatis!
+                sfx.playCorrect();
+                selectedBtn.classList.remove('bg-white', 'border-amber-400');
+                selectedBtn.classList.add('bg-emerald-500', 'border-emerald-700', 'text-white');
+
+                feedback.className = 'px-3 py-1 rounded-lg font-bold text-xs sm:text-sm bg-emerald-100 text-emerald-800 border border-emerald-400';
+                feedback.innerHTML = `✅ Benar! (${qData.explanation})`;
+                feedback.classList.remove('hidden');
+
+                gameState.logs[logIndex].solved = true;
+                spawnParticles(gameState.kancil.x, gameState.kancil.y, '#fbbf24', 18);
+
+                // Otomatis memicu lompatan setelah jeda singkat membaca umpan balik
+                setTimeout(() => {
+                    triggerJump();
+                }, 850);
+
+            } else {
+                // JAWABAN SALAH!
+                sfx.playSplashAndSnap();
+                selectedBtn.classList.remove('bg-white', 'border-amber-400');
+                selectedBtn.classList.add('bg-rose-500', 'border-rose-700', 'text-white');
+
+                feedback.className = 'px-3 py-1 rounded-lg font-bold text-xs sm:text-sm bg-rose-100 text-rose-800 border border-rose-400';
+                feedback.innerHTML = `❌ Salah! Kayu tempat Kancil berpijak oleng & buaya mendekat!`;
+                feedback.classList.remove('hidden');
+
+                gameState.lives--;
+                updateHUD();
+
+                setTimeout(() => {
+                    triggerWrongReaction(logIndex);
+                }, 900);
+            }
+        }
+
+        function triggerWrongReaction(currentLogIndex) {
+            gameState.screen = 'FALLING';
+            gameState.kancil.isScared = true;
+            const currentLog = gameState.logs[currentLogIndex];
+            currentLog.sinking = 1; // Kayu tempat Kancil berpijak oleng/tenggelam sesaat
+
+            // Efek cipratan air di sekitar kayu
+            spawnParticles(currentLog.x, currentLog.y + 15, '#e0f2fe', 24);
+            gameState.ripples.push({ x: currentLog.x, y: currentLog.y + 15, radius: 10, alpha: 1 });
+
+            // Buaya terdekat membuka rahang
+            let closestCroc = gameState.crocodiles[0];
+            let minDist = Infinity;
+            gameState.crocodiles.forEach(c => {
+                const d = Math.hypot(c.x - currentLog.x, c.y - currentLog.y);
+                if (d < minDist) {
+                    minDist = d;
+                    closestCroc = c;
+                }
+            });
+            if (closestCroc) closestCroc.jawOpen = 1.0;
+
+            setTimeout(() => {
+                currentLog.sinking = 0;
+                if (closestCroc) closestCroc.jawOpen = 0;
+
+                if (gameState.lives <= 0) {
+                    document.getElementById('questionModal').classList.add('hidden');
+                    endGame(false);
+                } else {
+                    // Reset tampilan soal yang sama di kayu ini agar pemain bisa mencoba menjawab lagi
+                    gameState.kancil.isScared = false;
+                    gameState.kancil.rotation = 0;
+                    showQuestionModal(gameState.currentStep);
+                }
+            }, 1200);
+        }
+
+        function endGame(isVictory) {
+            stopQuestionTimer();
+            gameState.screen = isVictory ? 'VICTORY' : 'GAMEOVER';
+            document.getElementById('questionModal').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+
+            const endEmoji = document.getElementById('endEmoji');
+            const endTitle = document.getElementById('endTitle');
+            const endMessage = document.getElementById('endMessage');
+            const finalLogs = document.getElementById('finalLogs');
+            const finalLives = document.getElementById('finalLives');
+
+            if (isVictory) {
+                sfx.playWin();
+                endEmoji.textContent = '🏆🦌🎉';
+                endTitle.textContent = 'Hore! Kancil Selamat!';
+                endTitle.className = 'text-2xl sm:text-3xl font-extrabold text-emerald-700 mb-2';
+                endMessage.textContent = 'Luar biasa! Kamu berhasil menjawab soal perbandingan dengan tepat dan membawa Si Kancil menyeberangi sungai!';
+                finalLogs.textContent = '5 / 5';
+                spawnParticles(gameState.kancil.x, gameState.kancil.y - 30, '#fbbf24', 45);
+            } else {
+                endEmoji.textContent = '🐊💦😢';
+                endTitle.textContent = 'Yah, Kancil Terjatuh!';
+                endTitle.className = 'text-2xl sm:text-3xl font-extrabold text-rose-700 mb-2';
+                endMessage.textContent = 'Nyawa Si Kancil habis karena terpeleset ke sungai buaya. Yuk hitung lebih teliti dan coba lagi!';
+                finalLogs.textContent = `${Math.max(0, gameState.currentStep - 1)} / 5`;
+            }
+
+            finalLives.textContent = `${gameState.lives} ❤️`;
+            document.getElementById('endScreen').classList.remove('hidden');
+        }
+
+        function updateHUD() {
+            const heartsContainer = document.getElementById('heartsContainer');
+            heartsContainer.innerHTML = '';
+            for (let i = 0; i < gameState.maxLives; i++) {
+                const span = document.createElement('span');
+                span.className = 'text-lg sm:text-2xl transition-transform duration-300 ' + (i < gameState.lives ? 'scale-100' : 'opacity-30 grayscale scale-75');
+                span.textContent = '❤️';
+                heartsContainer.appendChild(span);
+            }
+            const displayStep = Math.min(5, gameState.currentStep);
+            document.getElementById('progressText').textContent = `${displayStep} / 5`;
+        }
+
+        function spawnParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.5 + Math.random() * 4.5;
+                gameState.particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2,
+                    size: 3 + Math.random() * 5,
+                    color,
+                    alpha: 1,
+                    gravity: 0.15
+                });
+            }
+        }
+
+        /**
+         * RENDERING DUNIA GAME REALISTIS (CANVAS 2D)
+         */
+        function drawEnvironment() {
+            const leftBankWidth = Math.max(70, width * 0.13);
+            const rightBankWidth = Math.max(70, width * 0.13);
+
+            // 1. Air Sungai dengan Gradien Realistis
+            const waterGrad = ctx.createLinearGradient(0, 0, 0, height);
+            waterGrad.addColorStop(0, '#0f5e6e');
+            waterGrad.addColorStop(0.5, '#157a8c');
+            waterGrad.addColorStop(1, '#0b4654');
+            ctx.fillStyle = waterGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            // 2. Arus Air Sungai Beranimasi
+            ctx.strokeStyle = 'rgba(186, 230, 253, 0.16)';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            for (let row = 0; row < 14; row++) {
+                const y = (height / 14) * row + 20;
+                const flowOffset = (gameState.time * 45 + row * 90) % (width + 200) - 100;
+                ctx.beginPath();
+                ctx.moveTo(flowOffset, y);
+                ctx.quadraticCurveTo(flowOffset + 45, y - 6, flowOffset + 90, y);
+                ctx.stroke();
+            }
+
+            // 3. Ripples (Riak Air)
+            gameState.ripples.forEach((r, idx) => {
+                ctx.strokeStyle = `rgba(224, 242, 254, ${r.alpha})`;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.ellipse(r.x, r.y, r.radius * 1.5, r.radius * 0.8, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                r.radius += 1.4;
+                r.alpha -= 0.02;
+                if (r.alpha <= 0) gameState.ripples.splice(idx, 1);
+            });
+
+            // 4. Tepi Sungai Kiri (Tempat Start)
+            drawRiverBank(0, leftBankWidth, true);
+
+            // 5. Tepi Sungai Kanan (Tujuan Akhir)
+            drawRiverBank(width - rightBankWidth, rightBankWidth, false);
+        }
+
+        function drawRiverBank(x, bankWidth, isLeft) {
+            // Tanah & Lumpur Tepi
+            const dirtGrad = ctx.createLinearGradient(x, 0, x + bankWidth, 0);
+            if (isLeft) {
+                dirtGrad.addColorStop(0, '#3f6212');
+                dirtGrad.addColorStop(0.75, '#4d7c0f');
+                dirtGrad.addColorStop(0.92, '#78350f');
+                dirtGrad.addColorStop(1, '#451a03');
+            } else {
+                dirtGrad.addColorStop(0, '#451a03');
+                dirtGrad.addColorStop(0.08, '#78350f');
+                dirtGrad.addColorStop(0.25, '#4d7c0f');
+                dirtGrad.addColorStop(1, '#3f6212');
+            }
+
+            ctx.fillStyle = dirtGrad;
+            ctx.beginPath();
+            if (isLeft) {
+                ctx.moveTo(0, 0);
+                ctx.lineTo(bankWidth, 0);
+                for (let y = 0; y <= height; y += 30) {
+                    const wave = Math.sin(y * 0.03) * 8;
+                    ctx.lineTo(bankWidth + wave, y);
+                }
+                ctx.lineTo(0, height);
+            } else {
+                ctx.moveTo(width, 0);
+                ctx.lineTo(x, 0);
+                for (let y = 0; y <= height; y += 30) {
+                    const wave = Math.cos(y * 0.03) * 8;
+                    ctx.lineTo(x + wave, y);
+                }
+                ctx.lineTo(width, height);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            // Rumput & Semak-semak
+            ctx.fillStyle = '#65a30d';
+            for (let y = 25; y < height - 20; y += 45) {
+                const gx = isLeft ? bankWidth * 0.45 : x + bankWidth * 0.55;
+                ctx.beginPath();
+                ctx.arc(gx, y, 14, 0, Math.PI * 2);
+                ctx.arc(gx + 10, y + 6, 11, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Bendera Finish di Tepi Kanan
+            if (!isLeft) {
+                const fx = x + bankWidth * 0.5;
+                const fy = height * 0.72 - 45;
+                // Tiang
+                ctx.fillStyle = '#fef3c7';
+                ctx.fillRect(fx - 2, fy, 4, 50);
+                // Kain Bendera Berkilau
+                const wave = Math.sin(gameState.time * 5) * 4;
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(fx + 2, fy);
+                ctx.quadraticCurveTo(fx + 22, fy + wave, fx + 40, fy + 10);
+                ctx.lineTo(fx + 2, fy + 22);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        function drawLogs() {
+            gameState.logs.forEach((log, idx) => {
+                const bobY = Math.sin(gameState.time * 2.5 + log.bobOffset) * 4;
+                const sinkOffset = log.sinking * 18;
+                log.y = log.baseY + bobY + sinkOffset;
+
+                const x = log.x - log.width / 2;
+                const y = log.y - log.height / 2;
+                const w = log.width;
+                const h = log.height;
+
+                ctx.save();
+
+                // Efek sorotan (glow) pada kayu tempat Kancil sedang berdiri menjawab soal
+                const isCurrentLog = (gameState.screen === 'QUESTION' && gameState.currentStep === idx + 1);
+                if (isCurrentLog) {
+                    const pulse = 0.5 + Math.sin(gameState.time * 6) * 0.35;
+                    ctx.shadowColor = '#fde047';
+                    ctx.shadowBlur = 22 * pulse;
+                }
+
+                if (assets.log.loaded) {
+                    ctx.save();
+                    if (assets.log.processed) {
+                        // Gambar potongan kayu yang latar putihnya sudah dihapus piksel demi piksel
+                        ctx.drawImage(assets.log.processed, x, y, w, h);
+                    } else {
+                        // Fallback jika dibatasi CORS browser: gunakan multiply agar latar putih menyatu transparan
+                        ctx.globalCompositeOperation = 'multiply';
+                        ctx.drawImage(assets.log.img, x, y, w, h);
+                    }
+                    ctx.restore();
+                } else {
+                    // Fallback Vector Badan Batang Kayu
+                    const woodGrad = ctx.createLinearGradient(x, y, x + w, y);
+                    woodGrad.addColorStop(0, '#451a03');
+                    woodGrad.addColorStop(0.25, '#78350f');
+                    woodGrad.addColorStop(0.55, '#92400e');
+                    woodGrad.addColorStop(0.85, '#78350f');
+                    woodGrad.addColorStop(1, '#3b1502');
+
+                    ctx.fillStyle = woodGrad;
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, w, h, 18);
+                    ctx.fill();
+
+                    // Garis-garis serat kulit kayu
+                    ctx.strokeStyle = '#3b1502';
+                    ctx.lineWidth = 2;
+                    for (let line = 1; line <= 3; line++) {
+                        const lx = x + (w / 4) * line;
+                        ctx.beginPath();
+                        ctx.moveTo(lx, y + 12);
+                        ctx.lineTo(lx + (line % 2 === 0 ? 3 : -3), y + h - 12);
+                        ctx.stroke();
+                    }
+
+                    // Potongan lingkaran ujung atas kayu
+                    ctx.fillStyle = '#d97706';
+                    ctx.beginPath();
+                    ctx.ellipse(log.x, y + 10, w * 0.42, 8, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#78350f';
+                    ctx.stroke();
+                }
+
+                ctx.shadowBlur = 0;
+
+                // Nomor Kayu / Tanda Centang Jika Sudah Dijawab (diletakkan di bagian bawah kayu agar tidak tertutup kaki Kancil)
+                ctx.fillStyle = log.solved ? '#10b981' : (isCurrentLog ? '#facc15' : 'rgba(255,255,255,0.92)');
+                ctx.beginPath();
+                ctx.arc(log.x, log.y + log.height * 0.32, 13, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#451a03';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.fillStyle = log.solved ? '#ffffff' : '#451a03';
+                ctx.font = 'bold 14px Fredoka, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(log.solved ? '✓' : log.index, log.x, log.y + log.height * 0.33);
+
+                ctx.restore();
+            });
+        }
+
+        function drawCrocodiles() {
+            gameState.crocodiles.forEach(croc => {
+                // Gerakan patroli buaya
+                croc.x += croc.speed;
+                const margin = width * 0.18;
+                if (croc.x > width - margin) {
+                    croc.speed = -Math.abs(croc.speed);
+                    croc.dir = -1;
+                } else if (croc.x < margin) {
+                    croc.speed = Math.abs(croc.speed);
+                    croc.dir = 1;
+                }
+
+                const tailWag = Math.sin(gameState.time * 5 + croc.tailPhase) * 8;
+
+                ctx.save();
+                ctx.translate(croc.x, croc.y);
+                ctx.scale(croc.dir * croc.scale, croc.scale);
+
+                // Bayangan tubuh buaya di bawah permukaan air
+                ctx.fillStyle = 'rgba(4, 35, 30, 0.45)';
+                ctx.beginPath();
+                ctx.ellipse(0, 8, 65, 18, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Ekor Buaya Bergoyang
+                ctx.fillStyle = '#2d4c1e';
+                ctx.beginPath();
+                ctx.moveTo(-35, 0);
+                ctx.quadraticCurveTo(-65, tailWag * 0.5, -90, tailWag);
+                ctx.quadraticCurveTo(-65, tailWag * 0.5 + 10, -35, 8);
+                ctx.closePath();
+                ctx.fill();
+
+                // Punggung Buaya Bertekstur Sisik
+                const bodyGrad = ctx.createLinearGradient(0, -14, 0, 14);
+                bodyGrad.addColorStop(0, '#4d7c0f');
+                bodyGrad.addColorStop(0.5, '#365314');
+                bodyGrad.addColorStop(1, '#1a2e05');
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 42, 14, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Duri Punggung (Scutes)
+                ctx.fillStyle = '#1a2e05';
+                for (let s = -28; s <= 18; s += 11) {
+                    ctx.beginPath();
+                    ctx.moveTo(s - 4, -10);
+                    ctx.lineTo(s, -17);
+                    ctx.lineTo(s + 4, -10);
+                    ctx.fill();
+                }
+
+                // Moncong & Rahang Buaya
+                const jawAngle = croc.jawOpen * 0.35;
+
+                // Rahang Bawah
+                ctx.save();
+                ctx.translate(32, 3);
+                ctx.rotate(jawAngle);
+                ctx.fillStyle = '#3f6212';
+                ctx.beginPath();
+                ctx.roundRect(0, -3, 36, 8, 4);
+                ctx.fill();
+                // Gigi Bawah
+                ctx.fillStyle = '#fefce8';
+                for (let t = 6; t < 32; t += 7) {
+                    ctx.beginPath();
+                    ctx.moveTo(t, -3);
+                    ctx.lineTo(t + 2, -7);
+                    ctx.lineTo(t + 4, -3);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // Rahang Atas
+                ctx.save();
+                ctx.translate(32, -2);
+                ctx.rotate(-jawAngle);
+                ctx.fillStyle = '#4d7c0f';
+                ctx.beginPath();
+                ctx.roundRect(0, -7, 38, 9, 5);
+                ctx.fill();
+                // Gigi Atas
+                ctx.fillStyle = '#fefce8';
+                for (let t = 8; t < 34; t += 7) {
+                    ctx.beginPath();
+                    ctx.moveTo(t, 2);
+                    ctx.lineTo(t + 2, 6);
+                    ctx.lineTo(t + 4, 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // Mata Kuning Tajam Mengintip di Atas Air
+                ctx.fillStyle = '#eab308';
+                ctx.beginPath();
+                ctx.arc(26, -11, 5.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Pupil Vertikal
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.ellipse(27, -11, 1.5, 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            });
+        }
+
+        function drawKancil() {
+            const k = gameState.kancil;
+
+            // Update Animasi Lompatan Parabola
+            if (gameState.screen === 'JUMPING') {
+                k.jumpProgress += 0.032;
+                if (k.jumpProgress >= 1) {
+                    k.jumpProgress = 1;
+                    k.x = k.targetX;
+                    k.y = k.targetY;
+                    k.scaleX = 1.15;
+                    k.scaleY = 0.85; // Efek mendarat membal
+
+                    gameState.currentStep++;
+                    updateHUD();
+
+                    if (gameState.currentStep >= 1 && gameState.currentStep <= 5) {
+                        // Mendarat di atas potongan kayu ke-1..5 -> Munculkan soal sesuai nomor kayu!
+                        gameState.ripples.push({ x: k.x, y: k.y + 18, radius: 8, alpha: 0.9 });
+                        showQuestionModal(gameState.currentStep);
+                    } else {
+                        // Mendarat di tepi kanan (step 6) -> Berhasil menyeberangi sungai!
+                        endGame(true);
+                    }
+                } else {
+                    const t = k.jumpProgress;
+                    k.x = k.startX + (k.targetX - k.startX) * t;
+                    // Lengkungan lompatan tinggi (parabola)
+                    const arcHeight = Math.sin(t * Math.PI) * 85;
+                    k.y = k.startY + (k.targetY - k.startY) * t - arcHeight;
+                    k.scaleX = 0.92;
+                    k.scaleY = 1.12;
+                }
+            } else if (gameState.screen === 'FALLING') {
+                // Efek kancil kaget bergetar di tempat saat kayu di depan oleng
+                k.rotation = Math.sin(gameState.time * 35) * 0.14;
+            } else {
+                // Kembali ke proporsi normal saat diam
+                k.scaleX += (1 - k.scaleX) * 0.15;
+                k.scaleY += (1 - k.scaleY) * 0.15;
+                // Ikuti gerakan naik-turun kayu sehingga kaki tetap menginjak tepat di tengah potongan kayu
+                if (gameState.currentStep >= 1 && gameState.currentStep <= 5) {
+                    const log = gameState.logs[gameState.currentStep - 1];
+                    k.x = log.x;
+                    k.y = log.y;
+                }
+            }
+
+            const breathe = Math.sin(gameState.time * 4) * 1.5;
+
+            ctx.save();
+            ctx.translate(k.x, k.y);
+            ctx.rotate(k.rotation);
+            ctx.scale(k.scaleX, k.scaleY);
+
+            // Bayangan pijakan tepat di bawah telapak kaki Kancil (y = 0)
+            if (gameState.screen !== 'JUMPING' && gameState.screen !== 'FALLING') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+                ctx.beginPath();
+                ctx.ellipse(0, 2, 22, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (assets.kancil.loaded) {
+                // Gambar Si Kancil Kustom tanpa bingkai/latar putih, dibalik menghadap ke kanan,
+                // dan digambar sehingga bagian bawah kakinya menyentuh tepat titik pijakan (y = 2)
+                const imgW = 104;
+                const imgH = 104;
+
+                ctx.save();
+                // Balik horizontal agar menghadap ke kanan (arah tujuan seberang sungai)
+                ctx.scale(-1, 1);
+                // Posisi Y diatur agar telapak kaki kancil menapak di y = 2
+                ctx.drawImage(
+                    assets.kancil.processed || assets.kancil.img,
+                    -imgW / 2,
+                    -imgH + 8 + breathe * 0.4,
+                    imgW,
+                    imgH
+                );
+                ctx.restore();
+            } else {
+                // Fallback Vector Kancil (menghadap ke kanan, telapak kaki di y = 0)
+                ctx.save();
+                ctx.translate(0, -18);
+
+                ctx.strokeStyle = '#92400e';
+                ctx.lineWidth = 4.5;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(-8, 6);
+                ctx.lineTo(-10, 18);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(8, 6);
+                ctx.lineTo(10, 18);
+                ctx.stroke();
+
+                ctx.fillStyle = '#fef3c7';
+                ctx.beginPath();
+                ctx.arc(-18, 0 + breathe, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                const furGrad = ctx.createRadialGradient(-2, -2, 3, 0, 0, 22);
+                furGrad.addColorStop(0, '#f59e0b');
+                furGrad.addColorStop(0.7, '#d97706');
+                furGrad.addColorStop(1, '#b45309');
+                ctx.fillStyle = furGrad;
+                ctx.beginPath();
+                ctx.ellipse(-2, 0 + breathe, 17, 12, -0.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#fffbeb';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(8, -4 + breathe);
+                ctx.lineTo(11, 7 + breathe);
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(12, -14 + breathe);
+
+                ctx.fillStyle = '#b45309';
+                ctx.beginPath();
+                ctx.ellipse(-4, -14, 4, 11, -0.25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fde68a';
+                ctx.beginPath();
+                ctx.ellipse(-4, -14, 2, 7, -0.25, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#d97706';
+                ctx.beginPath();
+                ctx.ellipse(2, -15, 4, 11, 0.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.ellipse(2, 0, 12, 10, 0.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#fde68a';
+                ctx.beginPath();
+                ctx.ellipse(11, 2, 6, 4.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#1c1917';
+                ctx.beginPath();
+                ctx.arc(16, 1, 2.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#1c1917';
+                ctx.beginPath();
+                ctx.arc(5, -2, k.isScared ? 3.8 : 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(6, -3, 1.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        function drawParticles() {
+            gameState.particles.forEach((p, idx) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.alpha -= 0.022;
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                if (p.alpha <= 0) {
+                    gameState.particles.splice(idx, 1);
+                }
+            });
+        }
+
+        /**
+         * LOOP ANIMASI UTAMA
+         */
+        function gameLoop() {
+            gameState.time += 0.016;
+
+            ctx.clearRect(0, 0, width, height);
+
+            drawEnvironment();
+            drawCrocodiles();
+            drawLogs();
+            drawKancil();
+            drawParticles();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        /**
+         * EVENT LISTENERS INTERAKSI PENGGUNA (KLIK & SENTUH)
+         */
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+
+        // Toggle Audio On/Off
+        document.getElementById('soundToggleBtn').addEventListener('click', () => {
+            sfx.enabled = !sfx.enabled;
+            document.getElementById('soundIconOn').classList.toggle('hidden', !sfx.enabled);
+            document.getElementById('soundIconOff').classList.toggle('hidden', sfx.enabled);
+        });
+
+        // Jalankan saat halaman selesai dimuat
+        window.onload = function () {
+            resizeCanvas();
+            initEnvironment();
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
